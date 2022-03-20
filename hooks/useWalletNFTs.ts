@@ -25,7 +25,7 @@ const useWalletNfts = () => {
 
       setIsLoading(true);
 
-      const nftsForOwner = (await getNFTsForOwner(connection, wallet.publicKey)).filter(nft => nft.properties.creators[0].address == process.env.NEXT_PUBLIC_TREASURY_ADDRESS);
+      const nftsForOwner = (await getNFTsForOwner(connection, wallet.publicKey));
       console.log(nftsForOwner);
 
       setNfts(nftsForOwner as any);

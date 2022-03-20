@@ -3,6 +3,7 @@ import * as anchor from "@project-serum/anchor";
 import {
     awaitTransactionSignatureConfirmation,
     CandyMachine,
+    CandyMachineState,
     getCandyMachineState,
     mintMultipleToken,
     mintOneToken,
@@ -35,6 +36,8 @@ const txTimeout = 30000;
 export default function useCandyMachine() {
     const [, setBalance] = useWalletBalance();
     const [candyMachine, setCandyMachine] = useState<CandyMachine>();
+    const [candyMachineState, setCandyMachineState] = useState<CandyMachineState>();
+
     const wallet = useWallet();
     const [nftsData, setNftsData] = useState<any>(
         ({} = {
@@ -66,16 +69,16 @@ export default function useCandyMachine() {
                 signTransaction: wallet.signTransaction,
             } as anchor.Wallet;
 
-            const { candyMachine, goLiveDate, itemsRemaining } =
-                await getCandyMachineState(
-                    anchorWallet,
-                    candyMachineId,
-                    connection
-                );
+            const candyState = await getCandyMachineState(
+                anchorWallet,
+                candyMachineId,
+                connection
+            );
 
-            setIsSoldOut(itemsRemaining === 0);
-            setMintStartDate(goLiveDate);
-            setCandyMachine(candyMachine);
+            setIsSoldOut(candyState.isSoldOut);
+            setMintStartDate(candyState.goLiveDate);
+            setCandyMachine(candyState.candyMachine);
+            setCandyMachineState(candyState);
         })();
     }, [wallet, candyMachineId, connection]);
 
@@ -88,14 +91,17 @@ export default function useCandyMachine() {
                     signTransaction: wallet.signTransaction,
                 } as anchor.Wallet;
 
-                const { itemsRemaining, itemsRedeemed, itemsAvailable } =
-                    await getCandyMachineState(
-                        anchorWallet,
-                        candyMachineId,
-                        connection
-                    );
+                const candyState = await getCandyMachineState(
+                    anchorWallet,
+                    candyMachineId,
+                    connection
+                );
+                const itemsRemaining = candyState.itemsRemaining;
+                const itemsRedeemed = candyState.itemsRedeemed;
+                const itemsAvailable = candyState.itemsAvailable;
 
                 setNftsData({ itemsRemaining, itemsRedeemed, itemsAvailable });
+                setCandyMachineState(candyState);
             }
         })();
     }, [wallet, candyMachineId, connection, isMinting]);
@@ -103,28 +109,28 @@ export default function useCandyMachine() {
     const startMint = async () => {
         try {
             setIsMinting(true);
-            if (wallet.connected && candyMachine?.program && wallet.publicKey) {
-                const mintTxId = await mintOneToken(
+            if (wallet.connected && candyMachine?.program && wallet.publicKey && candyMachineState) {
+                const mintTxId = (await mintOneToken(
                     candyMachine,
-                    config,
                     wallet.publicKey,
-                    treasury
-                );
-
-                const status = await awaitTransactionSignatureConfirmation(
-                    mintTxId,
-                    txTimeout,
-                    connection,
-                    "singleGossip",
-                    false
-                );
-
-                if (!status?.err) {
-                    toast.success(
-                        "Congratulations! Mint succeeded! Check your wallet :)"
+                    candyMachineState
+                ))[0];
+                if (mintTxId) {
+                    const status = await awaitTransactionSignatureConfirmation(
+                        mintTxId,
+                        txTimeout,
+                        connection,
+                        "singleGossip",
+                        false
                     );
-                } else {
-                    toast.error("Mint failed! Please try again!");
+
+                    if (!status?.err) {
+                        toast.success(
+                            "Congratulations! Mint succeeded! Check your wallet :)"
+                        );
+                    } else {
+                        toast.error("Mint failed! Please try again!");
+                    }
                 }
             }
         } catch (error: any) {
