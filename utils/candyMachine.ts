@@ -396,7 +396,7 @@ export async function getNFTsForOwner(
             if (metadata.data.updateAuthority == process.env.NEXT_PUBLIC_TREASURY_ADDRESS) {
                 const dataRes = await fetch(metadata.data.data.uri);
                 console.log(dataRes);
-                if (dataRes.status === 202) {
+                if (dataRes.status === 202 || dataRes.status === 200) {
                     allTokens.push(await dataRes.json());
                 }
             }
